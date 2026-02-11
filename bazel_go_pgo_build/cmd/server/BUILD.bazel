@@ -1,0 +1,18 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "server_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ucpr/workspace2026/bazel_go_pgo_build/cmd/server",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "server",
+    embed = [":server_lib"],
+    # PGO プロファイルを指定してビルドを最適化する
+    # プロファイルが存在しない場合はこの行をコメントアウトするか、
+    # コマンドラインから指定: bazel build //cmd/server --@rules_go//go/config:pgoprofile=//profile:default.pgo
+    pgoprofile = "//profile:default.pgo",
+    visibility = ["//visibility:public"],
+)

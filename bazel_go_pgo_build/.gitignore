@@ -1,0 +1,6 @@
+# Bazel
+bazel-*
+MODULE.bazel.lock
+
+# PGO profile (binary, regenerate per environment)
+profile/default.pgo

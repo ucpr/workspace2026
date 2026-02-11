@@ -1,0 +1,4 @@
+load("@gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/ucpr/workspace2026/bazel_go_pgo_build
+gazelle(name = "gazelle")

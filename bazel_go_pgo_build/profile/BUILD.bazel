@@ -1,0 +1,4 @@
+exports_files(
+    ["default.pgo"],
+    visibility = ["//visibility:public"],
+)

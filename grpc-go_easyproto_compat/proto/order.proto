@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package orderpb;
+
+option go_package = "github.com/ucpr/workspace2026/grpc-go_easyproto_compat/gen/orderpb";
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  ORDER_STATUS_PENDING     = 1;
+  ORDER_STATUS_CONFIRMED   = 2;
+  ORDER_STATUS_SHIPPED     = 3;
+  ORDER_STATUS_DELIVERED   = 4;
+  ORDER_STATUS_CANCELLED   = 5;
+}
+
+message Address {
+  string street   = 1;
+  string city     = 2;
+  string state    = 3;
+  string zip_code = 4;
+  string country  = 5;
+}
+
+message OrderItem {
+  string product_id   = 1;
+  string product_name = 2;
+  int32  quantity     = 3;
+  double unit_price   = 4;
+}
+
+message Order {
+  string      order_id         = 1;
+  OrderStatus status           = 2;
+  Address     shipping_address = 3;
+  repeated OrderItem items     = 4;
+  int64       created_at       = 5;
+  bool        is_priority      = 6;
+  double      total_amount     = 7;
+}

@@ -1,0 +1,6 @@
+version: v2
+plugins:
+  - local: bin/protoc-gen-go
+    out: gen/orderpb
+    opt:
+      - paths=source_relative

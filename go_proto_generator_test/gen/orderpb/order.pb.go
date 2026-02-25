@@ -349,7 +349,7 @@ const file_order_proto_rawDesc = "" +
 	"\x16ORDER_STATUS_CONFIRMED\x10\x02\x12\x18\n" +
 	"\x14ORDER_STATUS_SHIPPED\x10\x03\x12\x1a\n" +
 	"\x16ORDER_STATUS_DELIVERED\x10\x04\x12\x1a\n" +
-	"\x16ORDER_STATUS_CANCELLED\x10\x05BDZBgithub.com/ucpr/workspace2026/grpc-go_easyproto_compat/gen/orderpbb\x06proto3"
+	"\x16ORDER_STATUS_CANCELLED\x10\x05BCZAgithub.com/ucpr/workspace2026/go_proto_generator_test/gen/orderpbb\x06proto3"
 
 var (
 	file_order_proto_rawDescOnce sync.Once

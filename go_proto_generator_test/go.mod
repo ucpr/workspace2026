@@ -1,4 +1,4 @@
-module github.com/ucpr/workspace2026/grpc-go_easyproto_compat
+module github.com/ucpr/workspace2026/go_proto_generator_test
 
 go 1.25.0
 

@@ -3,8 +3,8 @@ package testdata
 import (
 	"fmt"
 
-	easyorder "github.com/ucpr/workspace2026/grpc-go_easyproto_compat/easyproto"
-	"github.com/ucpr/workspace2026/grpc-go_easyproto_compat/gen/orderpb"
+	easyorder "github.com/ucpr/workspace2026/go_proto_generator_test/easyproto"
+	"github.com/ucpr/workspace2026/go_proto_generator_test/gen/orderpb"
 )
 
 // NewProtoOrder returns a sample Order using the standard protobuf type.

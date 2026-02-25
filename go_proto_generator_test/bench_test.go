@@ -5,9 +5,9 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	easyorder "github.com/ucpr/workspace2026/grpc-go_easyproto_compat/easyproto"
-	"github.com/ucpr/workspace2026/grpc-go_easyproto_compat/gen/orderpb"
-	"github.com/ucpr/workspace2026/grpc-go_easyproto_compat/testdata"
+	easyorder "github.com/ucpr/workspace2026/go_proto_generator_test/easyproto"
+	"github.com/ucpr/workspace2026/go_proto_generator_test/gen/orderpb"
+	"github.com/ucpr/workspace2026/go_proto_generator_test/testdata"
 )
 
 func BenchmarkMarshal_Proto(b *testing.B) {

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package orderpb;
 
-option go_package = "github.com/ucpr/workspace2026/grpc-go_easyproto_compat/gen/orderpb";
+option go_package = "github.com/ucpr/workspace2026/go_proto_generator_test/gen/orderpb";
 
 enum OrderStatus {
   ORDER_STATUS_UNSPECIFIED = 0;

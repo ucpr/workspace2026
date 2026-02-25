@@ -4,3 +4,8 @@ plugins:
     out: gen/orderpb
     opt:
       - paths=source_relative
+  - local: bin/protoc-gen-go-vtproto
+    out: gen/orderpb
+    opt:
+      - paths=source_relative
+      - features=marshal+unmarshal+size

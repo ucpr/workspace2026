@@ -5,6 +5,7 @@ GOBIN := $(CURDIR)/bin
 tools:
 	GOBIN=$(GOBIN) go install github.com/bufbuild/buf/cmd/buf@latest
 	GOBIN=$(GOBIN) go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	GOBIN=$(GOBIN) go install github.com/planetscale/vtprotobuf/cmd/protoc-gen-go-vtproto@latest
 
 generate: tools
 	PATH=$(GOBIN):$$PATH $(GOBIN)/buf generate

@@ -160,6 +160,243 @@ func TestLargeRepeated_CrossCompat(t *testing.T) {
 	})
 }
 
+// --- vtprotobuf compatibility tests ---
+
+// TestVTMarshal_ProtoUnmarshal verifies that MarshalVT output
+// can be unmarshaled by proto.Unmarshal.
+func TestVTMarshal_ProtoUnmarshal(t *testing.T) {
+	order := testdata.NewProtoOrder()
+
+	data, err := order.MarshalVT()
+	if err != nil {
+		t.Fatalf("MarshalVT failed: %v", err)
+	}
+
+	var decoded orderpb.Order
+	if err := proto.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("proto.Unmarshal failed: %v", err)
+	}
+
+	if !proto.Equal(order, &decoded) {
+		t.Fatal("VT marshal -> proto unmarshal: messages are not equal")
+	}
+}
+
+// TestProtoMarshal_VTUnmarshal verifies that proto.Marshal output
+// can be unmarshaled by UnmarshalVT.
+func TestProtoMarshal_VTUnmarshal(t *testing.T) {
+	order := testdata.NewProtoOrder()
+
+	data, err := proto.Marshal(order)
+	if err != nil {
+		t.Fatalf("proto.Marshal failed: %v", err)
+	}
+
+	var decoded orderpb.Order
+	if err := decoded.UnmarshalVT(data); err != nil {
+		t.Fatalf("UnmarshalVT failed: %v", err)
+	}
+
+	if !proto.Equal(order, &decoded) {
+		t.Fatal("proto marshal -> VT unmarshal: messages are not equal")
+	}
+}
+
+// TestRoundTrip_VTProto tests vtprotobuf marshal/unmarshal round-trip.
+func TestRoundTrip_VTProto(t *testing.T) {
+	order := testdata.NewProtoOrder()
+
+	data, err := order.MarshalVT()
+	if err != nil {
+		t.Fatalf("MarshalVT failed: %v", err)
+	}
+
+	var decoded orderpb.Order
+	if err := decoded.UnmarshalVT(data); err != nil {
+		t.Fatalf("UnmarshalVT failed: %v", err)
+	}
+
+	if !proto.Equal(order, &decoded) {
+		t.Fatal("VT round-trip: messages are not equal")
+	}
+}
+
+// TestVTMarshal_EasyUnmarshal verifies that MarshalVT output
+// can be unmarshaled by easyproto.
+func TestVTMarshal_EasyUnmarshal(t *testing.T) {
+	protoOrder := testdata.NewProtoOrder()
+
+	data, err := protoOrder.MarshalVT()
+	if err != nil {
+		t.Fatalf("MarshalVT failed: %v", err)
+	}
+
+	var easyOrder easyorder.Order
+	if err := easyOrder.UnmarshalProtobuf(data); err != nil {
+		t.Fatalf("easyproto UnmarshalProtobuf failed: %v", err)
+	}
+
+	assertOrderEqual(t, protoOrder, &easyOrder)
+}
+
+// TestEasyMarshal_VTUnmarshal verifies that easyproto marshal output
+// can be unmarshaled by UnmarshalVT.
+func TestEasyMarshal_VTUnmarshal(t *testing.T) {
+	easyOrder := testdata.NewEasyOrder()
+
+	data := easyOrder.MarshalProtobuf(nil)
+
+	var protoOrder orderpb.Order
+	if err := protoOrder.UnmarshalVT(data); err != nil {
+		t.Fatalf("UnmarshalVT failed: %v", err)
+	}
+
+	assertOrderEqual(t, &protoOrder, easyOrder)
+}
+
+// TestEmptyMessage_VTCompat tests vtprotobuf compatibility with empty messages.
+func TestEmptyMessage_VTCompat(t *testing.T) {
+	t.Run("vt_to_proto", func(t *testing.T) {
+		empty := &orderpb.Order{}
+		data, err := empty.MarshalVT()
+		if err != nil {
+			t.Fatalf("MarshalVT failed: %v", err)
+		}
+
+		var decoded orderpb.Order
+		if err := proto.Unmarshal(data, &decoded); err != nil {
+			t.Fatalf("proto.Unmarshal failed: %v", err)
+		}
+
+		if !proto.Equal(empty, &decoded) {
+			t.Fatal("empty message: VT marshal -> proto unmarshal mismatch")
+		}
+	})
+
+	t.Run("proto_to_vt", func(t *testing.T) {
+		empty := &orderpb.Order{}
+		data, err := proto.Marshal(empty)
+		if err != nil {
+			t.Fatalf("proto.Marshal failed: %v", err)
+		}
+
+		var decoded orderpb.Order
+		if err := decoded.UnmarshalVT(data); err != nil {
+			t.Fatalf("UnmarshalVT failed: %v", err)
+		}
+
+		if !proto.Equal(empty, &decoded) {
+			t.Fatal("empty message: proto marshal -> VT unmarshal mismatch")
+		}
+	})
+
+	t.Run("vt_to_easy", func(t *testing.T) {
+		empty := &orderpb.Order{}
+		data, err := empty.MarshalVT()
+		if err != nil {
+			t.Fatalf("MarshalVT failed: %v", err)
+		}
+
+		var easyOrder easyorder.Order
+		if err := easyOrder.UnmarshalProtobuf(data); err != nil {
+			t.Fatalf("easyproto UnmarshalProtobuf failed: %v", err)
+		}
+
+		if easyOrder.OrderID != "" || easyOrder.Status != 0 || easyOrder.ShippingAddress != nil ||
+			len(easyOrder.Items) != 0 || easyOrder.CreatedAt != 0 || easyOrder.IsPriority || easyOrder.TotalAmount != 0 {
+			t.Fatal("expected empty order after unmarshaling empty VT message")
+		}
+	})
+
+	t.Run("easy_to_vt", func(t *testing.T) {
+		empty := &easyorder.Order{}
+		data := empty.MarshalProtobuf(nil)
+
+		var decoded orderpb.Order
+		if err := decoded.UnmarshalVT(data); err != nil {
+			t.Fatalf("UnmarshalVT failed: %v", err)
+		}
+
+		if decoded.GetOrderId() != "" || decoded.GetStatus() != 0 || decoded.GetShippingAddress() != nil ||
+			len(decoded.GetItems()) != 0 || decoded.GetCreatedAt() != 0 || decoded.GetIsPriority() || decoded.GetTotalAmount() != 0 {
+			t.Fatal("expected empty order after unmarshaling empty easyproto message via VT")
+		}
+	})
+}
+
+// TestLargeRepeated_VTCompat tests vtprotobuf compatibility with 100 repeated items.
+func TestLargeRepeated_VTCompat(t *testing.T) {
+	const numItems = 100
+
+	t.Run("vt_to_proto", func(t *testing.T) {
+		order := &orderpb.Order{
+			OrderId: "ORD-LARGE-VT-001",
+			Status:  orderpb.OrderStatus_ORDER_STATUS_SHIPPED,
+			Items:   testdata.NewProtoOrderItems(numItems),
+		}
+
+		data, err := order.MarshalVT()
+		if err != nil {
+			t.Fatalf("MarshalVT failed: %v", err)
+		}
+
+		var decoded orderpb.Order
+		if err := proto.Unmarshal(data, &decoded); err != nil {
+			t.Fatalf("proto.Unmarshal failed: %v", err)
+		}
+
+		if len(decoded.GetItems()) != numItems {
+			t.Fatalf("expected %d items, got %d", numItems, len(decoded.GetItems()))
+		}
+		if !proto.Equal(order, &decoded) {
+			t.Fatal("large repeated: VT marshal -> proto unmarshal mismatch")
+		}
+	})
+
+	t.Run("vt_to_easy", func(t *testing.T) {
+		order := &orderpb.Order{
+			OrderId: "ORD-LARGE-VT-002",
+			Status:  orderpb.OrderStatus_ORDER_STATUS_SHIPPED,
+			Items:   testdata.NewProtoOrderItems(numItems),
+		}
+
+		data, err := order.MarshalVT()
+		if err != nil {
+			t.Fatalf("MarshalVT failed: %v", err)
+		}
+
+		var easyOrder easyorder.Order
+		if err := easyOrder.UnmarshalProtobuf(data); err != nil {
+			t.Fatalf("easyproto UnmarshalProtobuf failed: %v", err)
+		}
+
+		if len(easyOrder.Items) != numItems {
+			t.Fatalf("expected %d items, got %d", numItems, len(easyOrder.Items))
+		}
+		assertOrderEqual(t, order, &easyOrder)
+	})
+
+	t.Run("easy_to_vt", func(t *testing.T) {
+		easyOrder := &easyorder.Order{
+			OrderID: "ORD-LARGE-VT-003",
+			Status:  easyorder.OrderStatusShipped,
+			Items:   testdata.NewEasyOrderItems(numItems),
+		}
+
+		data := easyOrder.MarshalProtobuf(nil)
+
+		var decoded orderpb.Order
+		if err := decoded.UnmarshalVT(data); err != nil {
+			t.Fatalf("UnmarshalVT failed: %v", err)
+		}
+
+		if len(decoded.GetItems()) != numItems {
+			t.Fatalf("expected %d items, got %d", numItems, len(decoded.GetItems()))
+		}
+		assertOrderEqual(t, &decoded, easyOrder)
+	})
+}
+
 // assertOrderEqual compares a proto Order and an easyproto Order field by field.
 func assertOrderEqual(t *testing.T, pb *orderpb.Order, ep *easyorder.Order) {
 	t.Helper()

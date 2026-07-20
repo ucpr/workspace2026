@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package storage.v1;
+
+// StorageService persists orders in PostgreSQL. It is called by the
+// order service (grpc-service1).
+service StorageService {
+  rpc SaveOrder(SaveOrderRequest) returns (SaveOrderResponse);
+  rpc LoadOrder(LoadOrderRequest) returns (LoadOrderResponse);
+  rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse);
+}
+
+message StoredOrder {
+  int64 id = 1;
+  string item = 2;
+  int32 quantity = 3;
+  string status = 4;
+  string created_at = 5;
+}
+
+message SaveOrderRequest {
+  string item = 1;
+  int32 quantity = 2;
+}
+
+message SaveOrderResponse {
+  StoredOrder order = 1;
+}
+
+message LoadOrderRequest {
+  int64 id = 1;
+}
+
+message LoadOrderResponse {
+  StoredOrder order = 1;
+}
+
+message ListOrdersRequest {
+  int32 limit = 1;
+}
+
+message ListOrdersResponse {
+  repeated StoredOrder orders = 1;
+}

@@ -1,0 +1,95 @@
+name: dd-trace-go-with-otlp
+
+# dd-trace-go v2 (>= 2.9) can export spans over OTLP instead of the Datadog
+# native protocol. Setting OTEL_TRACES_EXPORTER=otlp makes it read
+# OTEL_EXPORTER_OTLP_TRACES_ENDPOINT / OTEL_EXPORTER_OTLP_TRACES_HEADERS.
+# It sends OTLP/HTTP protobuf (Content-Type: application/x-protobuf) to the
+# endpoint verbatim, so the URL must include the /v1/traces path.
+x-otel-env: &otel-env
+  OTEL_TRACES_EXPORTER: otlp
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://jaeger:4318/v1/traces
+  # Propagate context as W3C traceparent/tracestate across the gRPC hops.
+  DD_TRACE_PROPAGATION_STYLE: tracecontext
+  DD_ENV: dev
+  DD_VERSION: "0.1.0"
+  DD_TRACE_STARTUP_LOGS: "true"
+  # No Datadog agent in this stack; silence telemetry/appsec calls to :8126.
+  DD_INSTRUMENTATION_TELEMETRY_ENABLED: "false"
+  DD_APPSEC_ENABLED: "false"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: orders
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d orders"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # Jaeger receives OTLP directly (all-in-one, in-memory storage). UI on 16686.
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+
+  grpc-service2:
+    build:
+      context: .
+      args:
+        SERVICE: grpc-service2
+    environment:
+      <<: *otel-env
+      DD_SERVICE: grpc-service2
+      LISTEN_ADDR: ":50052"
+      DATABASE_URL: "postgres://app:app@postgres:5432/orders?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+
+  grpc-service1:
+    build:
+      context: .
+      args:
+        SERVICE: grpc-service1
+    environment:
+      <<: *otel-env
+      DD_SERVICE: grpc-service1
+      LISTEN_ADDR: ":50051"
+      STORAGE_ADDR: "grpc-service2:50052"
+    depends_on:
+      - grpc-service2
+      - jaeger
+
+  http-gateway:
+    build:
+      context: .
+      args:
+        SERVICE: http-gateway
+    environment:
+      <<: *otel-env
+      DD_SERVICE: http-gateway
+      LISTEN_ADDR: ":8080"
+      ORDER_ADDR: "grpc-service1:50051"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - grpc-service1
+      - jaeger
+
+volumes:
+  pgdata:

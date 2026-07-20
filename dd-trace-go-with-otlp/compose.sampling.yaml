@@ -1,0 +1,26 @@
+# Overlay for demonstrating head-based / parent-based sampling.
+#
+# dd-trace-go is a HEAD sampler: the entry service decides keep/drop once, and
+# the decision rides the W3C traceparent sampled flag to downstream services,
+# which honor it (parent-based). In OTLP export mode the fallback sampler is
+# `parentbased_always_on` (dd-trace-go PR #4567): honor the parent, else keep.
+#
+# This overlay pins gateway=KEEP and downstream=DROP to prove the downstream
+# services honor the parent's KEEP even though their own rate is 0.
+#
+#   docker compose -f compose.yaml -f compose.sampling.yaml up -d
+#   make smoke
+#   # -> full 3-service traces still appear in Jaeger (downstream honored KEEP)
+#
+# For the opposite proof (gateway=DROP -> whole trace dropped everywhere even
+# though downstream rate is 1.0), flip the values: gateway 0.0, downstream 1.0.
+services:
+  http-gateway:
+    environment:
+      DD_TRACE_SAMPLE_RATE: "1.0"
+  grpc-service1:
+    environment:
+      DD_TRACE_SAMPLE_RATE: "0.0"
+  grpc-service2:
+    environment:
+      DD_TRACE_SAMPLE_RATE: "0.0"

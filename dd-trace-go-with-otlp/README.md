@@ -16,12 +16,13 @@ spanning all three services and the database query — visible in the Jaeger UI.
 
 ## How the OTLP export works (dd-trace-go v2.9+)
 
-Setting `OTEL_TRACES_EXPORTER=otlp` switches the tracer from the Datadog native
-protocol to an OTLP writer that reads:
+Setting `OTEL_TRACES_EXPORTER=otlp` and `DD_TRACE_OTEL_ENABLED=true` switches
+the tracer from the Datadog native protocol to an OTLP writer that reads:
 
 | Env var                              | Purpose                                             |
 | ------------------------------------ | --------------------------------------------------- |
-| `OTEL_TRACES_EXPORTER=otlp`          | Enables OTLP export mode                             |
+| `OTEL_TRACES_EXPORTER=otlp`          | Selects OTLP as the trace export protocol            |
+| `DD_TRACE_OTEL_ENABLED=true`         | Enables the Datadog SDK OpenTelemetry compatibility layer |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Full URL, used verbatim — **must include `/v1/traces`** |
 | `OTEL_EXPORTER_OTLP_TRACES_HEADERS`  | Extra headers (e.g. auth), comma-separated `k=v`    |
 
@@ -93,6 +94,49 @@ W3C context:
 [grpc-service2]       └─ storage.v1.StorageService/SaveOrder (gRPC server)
 [grpc-service2]          └─ INSERT INTO orders ...          (SQL span)
 ```
+
+## Head-based / parent-based sampling
+
+dd-trace-go is a **head sampler**: the sampling decision is made once at the
+entry service (the head of the trace) and propagated downstream via the W3C
+`traceparent` sampled flag, so downstream services **honor the parent's
+decision** (parent-based). In OTLP export mode the fallback sampler is
+`parentbased_always_on` (dd-trace-go PR #4567, in v2.9+): honor the propagated
+decision, otherwise keep the trace at rate 1.0.
+
+Decision order per trace (`tracer.sample()`):
+
+1. Parent decision already propagated? → honor it (parent-based).
+2. `DD_TRACE_SAMPLING_RULES` (per service/name), then `DD_TRACE_SAMPLE_RATE` (global).
+3. Otherwise the fallback sampler (OTLP: keep at 1.0).
+
+Control the head rate with env vars on the **entry service**:
+
+```yaml
+DD_TRACE_SAMPLE_RATE: "0.1"                                   # keep 10%
+DD_TRACE_SAMPLING_RULES: '[{"service":"http-gateway","sample_rate":0.5}]'
+```
+
+`compose.sampling.yaml` is an overlay that demonstrates it. It pins
+`http-gateway` to keep (1.0) and both downstream services to drop (0.0):
+
+```sh
+docker compose -f compose.yaml -f compose.sampling.yaml up -d
+make smoke
+```
+
+Even though `grpc-service1`/`grpc-service2` are set to rate `0.0`, full
+three-service traces still appear in Jaeger — they honor the gateway's KEEP
+decision. Flip the values (gateway `0.0`, downstream `1.0`) and the whole trace
+is dropped everywhere while the business logic (DB writes) still runs — proving
+the head decision, not each service, controls sampling.
+
+Verified in this repo:
+
+| Experiment | gateway | service1/2 | Jaeger result                       | Meaning              |
+| ---------- | ------- | ---------- | ----------------------------------- | -------------------- |
+| A          | 1.0     | **0.0**    | full 6-span / 3-service traces kept | parent **KEEP** honored |
+| B          | **0.0** | 1.0        | 0 new traces (DB writes still ran)  | parent **DROP** honored |
 
 ## Note on startup logs
 

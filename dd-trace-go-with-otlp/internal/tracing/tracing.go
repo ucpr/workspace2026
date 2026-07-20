@@ -16,8 +16,9 @@ import (
 func Start(service string) func() {
 	// Export mode (OTLP vs Datadog agent), endpoint, env, version and
 	// propagation style are all driven by env vars (OTEL_TRACES_EXPORTER,
-	// OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, DD_ENV, DD_VERSION,
-	// DD_TRACE_PROPAGATION_STYLE), so nothing else is configured here.
+	// DD_TRACE_OTEL_ENABLED, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, DD_ENV,
+	// DD_VERSION, DD_TRACE_PROPAGATION_STYLE), so nothing else is configured
+	// here.
 	tracer.Start(
 		tracer.WithService(service),
 	)

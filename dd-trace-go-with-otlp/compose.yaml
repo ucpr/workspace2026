@@ -1,12 +1,14 @@
 name: dd-trace-go-with-otlp
 
 # dd-trace-go v2 (>= 2.9) can export spans over OTLP instead of the Datadog
-# native protocol. Setting OTEL_TRACES_EXPORTER=otlp makes it read
+# native protocol. Setting OTEL_TRACES_EXPORTER=otlp and
+# DD_TRACE_OTEL_ENABLED=true enables the OTLP export path and makes it read
 # OTEL_EXPORTER_OTLP_TRACES_ENDPOINT / OTEL_EXPORTER_OTLP_TRACES_HEADERS.
 # It sends OTLP/HTTP protobuf (Content-Type: application/x-protobuf) to the
 # endpoint verbatim, so the URL must include the /v1/traces path.
 x-otel-env: &otel-env
   OTEL_TRACES_EXPORTER: otlp
+  DD_TRACE_OTEL_ENABLED: "true"
   OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://jaeger:4318/v1/traces
   # Propagate context as W3C traceparent/tracestate across the gRPC hops.
   DD_TRACE_PROPAGATION_STYLE: tracecontext

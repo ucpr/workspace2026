@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars and adjust. Do not commit terraform.tfvars if
+# you put anything sensitive in it (this file has nothing sensitive by
+# design - the GitHub token is set separately via SSM, never here).
+
+aws_region   = "us-east-1"
+project_name = "releascope"
+environment  = "dev"
+
+repositories = [
+  "open-telemetry/opentelemetry-collector",
+  "open-telemetry/opentelemetry-collector-contrib",
+]
+
+schedule_expression = "rate(1 hour)"
+
+bedrock_model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+
+# Point this at your OpenTelemetry Collector (e.g. an ECS/Fargate task,
+# or a local Collector during development via a tunnel). Leave empty to
+# export traces/metrics to stdout (CloudWatch Logs) instead - Releascope
+# works fully without a Collector.
+otel_exporter_otlp_endpoint = ""

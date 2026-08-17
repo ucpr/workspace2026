@@ -1,0 +1,325 @@
+{
+  "Comment": "Releascope Release Check workflow (spec section 5). Iterates configured repositories in parallel, and for each one checks GitHub for a new release, fetches context (compare/PRs/components) concurrently, asks Bedrock to analyze the impact, and persists the result.",
+  "StartAt": "ListRepositories",
+  "States": {
+    "ListRepositories": {
+      "Type": "Pass",
+      "Comment": "Repositories + traceContext always arrive in the execution input (EventBridge Scheduler's static target input for scheduled runs, or the API's manual /check trigger for a single repository) - this state exists purely to name that step in the trace/console, matching the architecture diagram.",
+      "Next": "MapRepository"
+    },
+    "MapRepository": {
+      "Type": "Map",
+      "Comment": "One independent trace per repository (see README Trace Propagation section for why check runs are not correlated across repositories in this MVP).",
+      "ItemsPath": "$.repositories",
+      "MaxConcurrency": ${map_max_concurrency},
+      "ItemSelector": {
+        "repository.$": "$$.Map.Item.Value",
+        "traceContext.$": "$.traceContext"
+      },
+      "ItemProcessor": {
+        "ProcessorConfig": { "Mode": "INLINE" },
+        "StartAt": "CheckLatestRelease",
+        "States": {
+          "CheckLatestRelease": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName": "${check_release_function_arn}",
+              "Payload.$": "$"
+            },
+            "ResultSelector": { "result.$": "$.Payload" },
+            "ResultPath": "$.check",
+            "Retry": [
+              {
+                "ErrorEquals": ["github_rate_limit", "github_timeout", "github_server_error"],
+                "IntervalSeconds": 5,
+                "BackoffRate": 2.0,
+                "MaxAttempts": 5
+              },
+              {
+                "ErrorEquals": ["storage_error"],
+                "IntervalSeconds": 2,
+                "BackoffRate": 2.0,
+                "MaxAttempts": 3
+              },
+              {
+                "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+                "IntervalSeconds": 2,
+                "BackoffRate": 2.0,
+                "MaxAttempts": 3
+              }
+            ],
+            "Catch": [
+              { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "RecordFailure" }
+            ],
+            "Next": "IsNewRelease"
+          },
+          "IsNewRelease": {
+            "Type": "Choice",
+            "Choices": [
+              { "Variable": "$.check.result.isNew", "BooleanEquals": true, "Next": "FetchReleaseContext" }
+            ],
+            "Default": "NoNewRelease"
+          },
+          "NoNewRelease": {
+            "Type": "Pass",
+            "Parameters": {
+              "repository.$": "$.repository",
+              "isNew": false
+            },
+            "End": true
+          },
+          "FetchReleaseContext": {
+            "Type": "Parallel",
+            "Comment": "Compare/PullRequests/ExtractChanges run concurrently as three independent, individually-retried Task states (spec section 5's Parallel requirement); all three are children of CheckLatestRelease's release.check span via the traceContext carried in $.check.result.traceContext (see README).",
+            "ResultPath": "$.contextResults",
+            "Branches": [
+              {
+                "StartAt": "CompareCommits",
+                "States": {
+                  "CompareCommits": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::lambda:invoke",
+                    "Parameters": {
+                      "FunctionName": "${fetch_context_function_arn}",
+                      "Payload": {
+                        "action": "compare",
+                        "repository.$": "$.repository",
+                        "previousVersion.$": "$.check.result.previousVersion",
+                        "currentVersion.$": "$.check.result.currentVersion",
+                        "targetCommitish.$": "$.check.result.targetCommitish",
+                        "traceContext.$": "$.check.result.traceContext"
+                      }
+                    },
+                    "ResultSelector": { "result.$": "$.Payload" },
+                    "Retry": [
+                      {
+                        "ErrorEquals": ["github_rate_limit", "github_timeout", "github_server_error"],
+                        "IntervalSeconds": 5,
+                        "BackoffRate": 2.0,
+                        "MaxAttempts": 5
+                      },
+                      {
+                        "ErrorEquals": ["storage_error"],
+                        "IntervalSeconds": 2,
+                        "BackoffRate": 2.0,
+                        "MaxAttempts": 3
+                      },
+                      {
+                        "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+                        "IntervalSeconds": 2,
+                        "BackoffRate": 2.0,
+                        "MaxAttempts": 3
+                      }
+                    ],
+                    "Catch": [
+                      { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "CompareFailed" }
+                    ],
+                    "End": true
+                  },
+                  "CompareFailed": {
+                    "Type": "Pass",
+                    "Comment": "Compare is best-effort context; a failure here should not abort the whole release check. Every key AnalyzeWithLLM later dereferences by JSONPath must still be present (as an empty value), or that Parameters block throws its own 'path not found' runtime error.",
+                    "Parameters": { "result": { "compareS3Uri": "" } },
+                    "End": true
+                  }
+                }
+              },
+              {
+                "StartAt": "FetchPullRequests",
+                "States": {
+                  "FetchPullRequests": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::lambda:invoke",
+                    "Parameters": {
+                      "FunctionName": "${fetch_context_function_arn}",
+                      "Payload": {
+                        "action": "pull_requests",
+                        "repository.$": "$.repository",
+                        "previousVersion.$": "$.check.result.previousVersion",
+                        "currentVersion.$": "$.check.result.currentVersion",
+                        "previousPublishedAt.$": "$.check.result.previousPublishedAt",
+                        "currentPublishedAt.$": "$.check.result.publishedAt",
+                        "traceContext.$": "$.check.result.traceContext"
+                      }
+                    },
+                    "ResultSelector": { "result.$": "$.Payload" },
+                    "Retry": [
+                      {
+                        "ErrorEquals": ["github_rate_limit", "github_timeout", "github_server_error"],
+                        "IntervalSeconds": 5,
+                        "BackoffRate": 2.0,
+                        "MaxAttempts": 5
+                      },
+                      {
+                        "ErrorEquals": ["storage_error"],
+                        "IntervalSeconds": 2,
+                        "BackoffRate": 2.0,
+                        "MaxAttempts": 3
+                      },
+                      {
+                        "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+                        "IntervalSeconds": 2,
+                        "BackoffRate": 2.0,
+                        "MaxAttempts": 3
+                      }
+                    ],
+                    "Catch": [
+                      { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "PullRequestsFailed" }
+                    ],
+                    "End": true
+                  },
+                  "PullRequestsFailed": {
+                    "Type": "Pass",
+                    "Comment": "Pull request list is best-effort context; a failure here should not abort the whole release check. Every key AnalyzeWithLLM later dereferences by JSONPath must still be present (as an empty value), or that Parameters block throws its own 'path not found' runtime error.",
+                    "Parameters": { "result": { "pullRequestsS3Uri": "" } },
+                    "End": true
+                  }
+                }
+              },
+              {
+                "StartAt": "ExtractChanges",
+                "States": {
+                  "ExtractChanges": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::lambda:invoke",
+                    "Parameters": {
+                      "FunctionName": "${fetch_context_function_arn}",
+                      "Payload": {
+                        "action": "extract_changes",
+                        "repository.$": "$.repository",
+                        "currentReleaseS3Uri.$": "$.check.result.currentReleaseS3Uri",
+                        "traceContext.$": "$.check.result.traceContext"
+                      }
+                    },
+                    "ResultSelector": { "result.$": "$.Payload" },
+                    "Retry": [
+                      {
+                        "ErrorEquals": ["storage_error"],
+                        "IntervalSeconds": 2,
+                        "BackoffRate": 2.0,
+                        "MaxAttempts": 3
+                      },
+                      {
+                        "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+                        "IntervalSeconds": 2,
+                        "BackoffRate": 2.0,
+                        "MaxAttempts": 3
+                      }
+                    ],
+                    "Catch": [
+                      { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "ExtractChangesFailed" }
+                    ],
+                    "End": true
+                  },
+                  "ExtractChangesFailed": {
+                    "Type": "Pass",
+                    "Comment": "Component extraction is best-effort context; a failure here should not abort the whole release check.",
+                    "Parameters": { "result": { "affectedComponents": [] } },
+                    "End": true
+                  }
+                }
+              }
+            ],
+            "Next": "AnalyzeWithLLM"
+          },
+          "AnalyzeWithLLM": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName": "${analyze_release_function_arn}",
+              "Payload": {
+                "repository.$": "$.repository",
+                "previousVersion.$": "$.check.result.previousVersion",
+                "currentVersion.$": "$.check.result.currentVersion",
+                "publishedAt.$": "$.check.result.publishedAt",
+                "releaseUrl.$": "$.check.result.releaseUrl",
+                "currentReleaseS3Uri.$": "$.check.result.currentReleaseS3Uri",
+                "compareS3Uri.$": "$.contextResults[0].result.compareS3Uri",
+                "pullRequestsS3Uri.$": "$.contextResults[1].result.pullRequestsS3Uri",
+                "extractedComponents.$": "$.contextResults[2].result.affectedComponents",
+                "traceContext.$": "$.check.result.traceContext"
+              }
+            },
+            "ResultSelector": { "result.$": "$.Payload" },
+            "ResultPath": "$.analysis",
+            "Retry": [
+              {
+                "ErrorEquals": ["bedrock_throttling", "bedrock_timeout", "bedrock_invalid_response"],
+                "IntervalSeconds": 5,
+                "BackoffRate": 2.0,
+                "MaxAttempts": 5
+              },
+              {
+                "ErrorEquals": ["storage_error"],
+                "IntervalSeconds": 2,
+                "BackoffRate": 2.0,
+                "MaxAttempts": 3
+              },
+              {
+                "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+                "IntervalSeconds": 2,
+                "BackoffRate": 2.0,
+                "MaxAttempts": 3
+              }
+            ],
+            "Catch": [
+              { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "RecordFailure" }
+            ],
+            "Next": "PersistRelease"
+          },
+          "PersistRelease": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName": "${persist_release_function_arn}",
+              "Payload": {
+                "repository.$": "$.repository",
+                "previousVersion.$": "$.check.result.previousVersion",
+                "currentVersion.$": "$.check.result.currentVersion",
+                "publishedAt.$": "$.check.result.publishedAt",
+                "releaseUrl.$": "$.check.result.releaseUrl",
+                "currentReleaseS3Uri.$": "$.check.result.currentReleaseS3Uri",
+                "llmRawResponseS3Uri.$": "$.analysis.result.llmRawResponseS3Uri",
+                "analysis.$": "$.analysis.result.analysis",
+                "traceContext.$": "$.analysis.result.traceContext"
+              }
+            },
+            "ResultSelector": { "result.$": "$.Payload" },
+            "ResultPath": "$.persisted",
+            "Retry": [
+              {
+                "ErrorEquals": ["storage_error"],
+                "IntervalSeconds": 2,
+                "BackoffRate": 2.0,
+                "MaxAttempts": 5
+              },
+              {
+                "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+                "IntervalSeconds": 2,
+                "BackoffRate": 2.0,
+                "MaxAttempts": 3
+              }
+            ],
+            "Catch": [
+              { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "RecordFailure" }
+            ],
+            "End": true
+          },
+          "RecordFailure": {
+            "Type": "Pass",
+            "Comment": "Catch-all landing state: records the error in this Map iteration's own output without failing the whole Map, so one repository's failure never blocks the others (spec section 5/21 Catch requirement).",
+            "Parameters": {
+              "repository.$": "$.repository",
+              "failed": true,
+              "error.$": "$.error"
+            },
+            "End": true
+          }
+        }
+      },
+      "ResultPath": "$.mapResults",
+      "End": true
+    }
+  }
+}

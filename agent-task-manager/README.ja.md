@@ -1,21 +1,21 @@
 # atama
 
-コーディングエージェントに作業を委譲するためのタスク管理ツール。
+コーディングエージェントに作業を委譲するためのタスク管理ツールです。
 
-atama はタスク・依存関係・状態をリポジトリ内のプレーンな YAML で管理する。タスクの実行そのものは行わず、エージェントが必要とする唯一の問い —— **次に何をやればいいか** —— にだけ答える。
+atama はタスク・依存関係・状態をリポジトリ内のプレーンな YAML で管理します。タスクの実行そのものは行わず、エージェントが必要とする唯一の問い —— **次に何をやればいいか** —— にだけ答えます。
 
 English: [README.md](README.md)
 
 ## なぜ
 
-エージェント（Claude Code, Codex など）はタスクの実行は得意だが、どのタスクが着手可能かの判断は苦手だ。Issue やチャットの指示には機械可読な順序が含まれておらず、結局は人間が手で順番を決めることになる。
+エージェント（Claude Code, Codex など）はタスクの実行は得意ですが、どのタスクが着手可能かの判断は苦手です。Issue やチャットの指示には機械可読な順序が含まれておらず、結局は人間が手で順番を決めることになります。
 
-atama はその順序を明示する。
+atama はその順序を明示します。
 
-- タスクは `depends_on` で DAG を構成する。循環は拒否される。
-- `atama next` は依存がすべて満たされたタスクを依存順に JSON で返す。
-- エージェントは実行し、`atama complete <id>` を呼び、次を取得する。このループがプロトコルのすべて。
-- 1タスク1ファイルの YAML を `.atama/` に置くため、タスクの状態変化をコードと同じように git でレビューできる。
+- タスクは `depends_on` で DAG を構成します。循環は拒否されます。
+- `atama next` は依存がすべて満たされたタスクを依存順に JSON で返します。
+- エージェントは実行し、`atama complete <id>` を呼び、次を取得します。このループがプロトコルのすべてです。
+- 1タスク1ファイルの YAML を `.atama/` に置くため、タスクの状態変化をコードと同じように git でレビューできます。
 
 ## インストール
 
@@ -23,7 +23,7 @@ atama はその順序を明示する。
 go install github.com/ucpr/atama/cmd/atama@latest
 ```
 
-Go 1.25 以上が必要。GitHub 連携には `gh`（または `GITHUB_TOKEN`）を使う。
+Go 1.25 以上が必要です。GitHub 連携には `gh`（または `GITHUB_TOKEN`）を使います。
 
 ## クイックスタート
 
@@ -45,7 +45,7 @@ $ atama task list
   atm-01a0757a-e6c7-8311-9cd6-24094a33deff  blocked      medium  結合テストの作成
 ```
 
-`*` は Ready なタスク。他の2件の `blocked` は誰かが設定した値ではなく、未解決の依存から**導出された**状態。
+`*` は Ready なタスクです。他の2件の `blocked` は誰かが設定した値ではなく、未解決の依存から**導出された**状態です。
 
 ```console
 $ atama next --goal "$goal"
@@ -58,13 +58,13 @@ $ atama next --goal "$goal"
 Next task: atm-01a0757a-e6b6-870d-8630-b34aa3fddb38  /search エンドポイントの実装
 ```
 
-ID は一意に定まる限り前方一致で指定できるので、`atm-01a0757a-e6a5` で十分。
+ID は一意に定まる限り前方一致で指定できるので、`atm-01a0757a-e6a5` で十分です。
 
 ## ユースケース
 
 ### 1. エージェントがゴールを最後まで進める
 
-全コマンドが `--output json` に対応しているため、ループは数行のシェルで書ける。
+全コマンドが `--output json` に対応しているため、ループは数行のシェルで書けます。
 
 ```sh
 while :; do
@@ -77,7 +77,7 @@ while :; do
 done
 ```
 
-`next` は本文・ラベル・依存関係・紐づく Issue・worktree など、実行に必要な情報をすべて返す。
+`next` は本文・ラベル・依存関係・紐づく Issue・worktree など、実行に必要な情報をすべて返します。
 
 ```json
 [
@@ -95,7 +95,7 @@ done
 
 ### 2. 複数エージェントの並列実行（1タスク1 worktree）
 
-同じチェックアウトで2つのエージェントを動かすと互いの変更を壊す。`--worktree` を付けると、次のタスクに専用のブランチとディレクトリを同じ呼び出しで割り当てる。
+同じチェックアウトで2つのエージェントを動かすと互いの変更を壊してしまいます。`--worktree` を付けると、次のタスクに専用のブランチとディレクトリを同じ呼び出しで割り当てます。
 
 ```console
 $ atama next --worktree
@@ -111,7 +111,7 @@ atama worktree list          # 実行中のものを確認
 atama worktree rm "$id"      # 後片付け（--force で未コミットの変更を破棄）
 ```
 
-パスやブランチは指定可能: `atama worktree add <id> --branch feat/search --path ../wt --start-point main`
+パスやブランチは指定できます: `atama worktree add <id> --branch feat/search --path ../wt --start-point main`
 
 ### 3. 人間によるボード上での整理
 
@@ -119,7 +119,7 @@ atama worktree rm "$id"      # 後片付け（--force で未コミットの変�
 atama board
 ```
 
-vim ライクなキーバインドのカンバンボード。カラムがステータスで、`space` でタスクを進め、`D` で依存関係を編集、`g` で依存グラフを表示、`S` で GitHub sync を実行する。CLI とファイルを共有しているため、エージェントの `complete` は `r`（リロード）で反映される。
+vim ライクなキーバインドのカンバンボードが起動します。カラムがステータスで、`space` でタスクを進め、`D` で依存関係を編集し、`g` で依存グラフを表示し、`S` で GitHub sync を実行します。CLI とファイルを共有しているため、エージェントの `complete` は `r`（リロード）で反映されます。
 
 ### 4. GitHub Issues との双方向連携
 
@@ -132,7 +132,7 @@ atama github sync --dry-run             # 差分のプレビュー
 atama github sync                       # 適用
 ```
 
-sync は双方向で、Issue 本体だけでなくコメントスレッドも対象にする。コンフリクトは `updated_at` による後勝ち、削除は編集より優先される。`depends_on` と `goal_ids` は GitHub 側に対応する項目がないため、Issue 本文末尾の不可視な `<!-- atama:meta -->` ブロックに埋め込まれる。認証は `gh auth token`（`GITHUB_TOKEN` があればそちら優先）に委譲し、トークンをリポジトリに書き出すことはない。
+sync は双方向で、Issue 本体だけでなくコメントスレッドも対象にします。コンフリクトは `updated_at` による後勝ち、削除は編集より優先されます。`depends_on` と `goal_ids` は GitHub 側に対応する項目がないため、Issue 本文末尾の不可視な `<!-- atama:meta -->` ブロックに埋め込まれます。認証は `gh auth token`（`GITHUB_TOKEN` があればそちらを優先）に委譲しており、トークンをリポジトリに書き出すことはありません。
 
 ## コマンド
 
@@ -154,15 +154,15 @@ sync は双方向で、Issue 本体だけでなくコメントスレッドも対
 | `github import/export/sync/set-repo` | GitHub Issues 連携 |
 | `board` | TUI を起動 |
 
-グローバルフラグ: `--output text|json`、`--dir <path>`
+グローバルフラグは `--output text|json` と `--dir <path>` です。
 
-ステータス: `backlog` `ready` `in_progress` `blocked` `in_review` `done` `cancelled`。遷移に制約はなく、`done` から `in_progress` に戻すこともできる。
+ステータスは `backlog` `ready` `in_progress` `blocked` `in_review` `done` `cancelled` の7種類です。遷移に制約はなく、`done` から `in_progress` に戻すこともできます。
 
-優先度: `low` `medium` `high` `urgent`
+優先度は `low` `medium` `high` `urgent` です。
 
 ## エージェント向けの仕様
 
-エラーは構造化され、終了コードで判別できる。テキストをパースする必要はない。
+エラーは構造化され、終了コードで判別できます。テキストをパースする必要はありません。
 
 ```console
 $ atama dep add atm-01a0757a-e6a5 --on atm-01a0757a-e6c7 --output json
@@ -178,11 +178,11 @@ $ echo $?
 | 2 | バリデーションエラー（不正な入力、循環依存） |
 | 3 | タスク・ゴール・ストアが見つからない |
 
-変更系コマンドはすべて非対話的に実行できる。複数プロセス（複数エージェント + TUI）からの同時アクセスはファイルロックで保護される。
+変更系コマンドはすべて非対話的に実行できます。複数プロセス（複数エージェント + TUI）からの同時アクセスはファイルロックで保護されます。
 
 ## データの保存形式
 
-`atama init` が `.atama/` を作成し、以降は git が `.git` を探すのと同じようにカレントディレクトリから上へ辿って発見する。1タスク1ファイルなので diff が意味を持つ。
+`atama init` が `.atama/` を作成し、以降は git が `.git` を探すのと同じようにカレントディレクトリから上へ辿って発見します。1タスク1ファイルなので diff が意味を持ちます。
 
 ```
 .atama/
@@ -208,7 +208,7 @@ execution:
         branch: atama/atm-01a0757a-e6b6-…
 ```
 
-ID は `atm-`（タスク）/ `atm-g-`（ゴール）プレフィックス + UUIDv8。先頭48ビットが生成時刻のため、文字列ソートがそのまま時刻順になる。`config.yaml` は将来のマイグレーション用に `schema_version` を持つ。
+ID は `atm-`（タスク）/ `atm-g-`（ゴール）プレフィックス + UUIDv8 です。先頭48ビットが生成時刻のため、文字列ソートがそのまま時刻順になります。`config.yaml` は将来のマイグレーション用に `schema_version` を持ちます。
 
 ## TUI キーバインド
 
@@ -229,4 +229,4 @@ esc       閉じる/解除         q / ctrl+c 終了
 
 ## スコープ
 
-v0.1 は個人・単一マシン・単一リポジトリを前提とする。複数人での共有、複数リポジトリ横断、実行フックのランナー本体（`execution.executor` は保持・受け渡しのみで起動はしない）は対象外だが、拡張できる設計になっている。詳細な要件は [specs/requirements.md](specs/requirements.md) を参照。
+v0.1 は個人・単一マシン・単一リポジトリを前提としています。複数人での共有、複数リポジトリ横断、実行フックのランナー本体（`execution.executor` は保持・受け渡しのみで起動はしません）は対象外ですが、拡張できる設計になっています。詳細な要件は [specs/requirements.md](specs/requirements.md) を参照してください。

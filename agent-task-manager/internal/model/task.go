@@ -105,8 +105,9 @@ type Comment struct {
 // (requirements §5.3, §8.3): v0.1 only stores and passes through this data,
 // it never launches anything.
 type Execution struct {
-	Executor string   `yaml:"executor,omitempty" json:"executor,omitempty"`
-	LastRun  *RunInfo `yaml:"last_run,omitempty" json:"last_run,omitempty"`
+	Executor string    `yaml:"executor,omitempty"  json:"executor,omitempty"`
+	LastRun  *RunInfo  `yaml:"last_run,omitempty"   json:"last_run,omitempty"`
+	Worktree *Worktree `yaml:"worktree,omitempty"   json:"worktree,omitempty"`
 }
 
 // RunInfo records the outcome of an executor invocation.
@@ -115,4 +116,14 @@ type RunInfo struct {
 	FinishedAt *time.Time `yaml:"finished_at,omitempty" json:"finished_at,omitempty"`
 	ExitCode   *int       `yaml:"exit_code,omitempty"   json:"exit_code,omitempty"`
 	LogPath    string     `yaml:"log_path,omitempty"    json:"log_path,omitempty"`
+}
+
+// Worktree records the isolated git worktree a task is being (or was)
+// worked on in, so a delegated agent can pick up the task and `cd` straight
+// to its own checkout instead of sharing the main working directory with
+// every other in-flight task.
+type Worktree struct {
+	Path      string    `yaml:"path"       json:"path"`
+	Branch    string    `yaml:"branch"     json:"branch"`
+	CreatedAt time.Time `yaml:"created_at" json:"created_at"`
 }

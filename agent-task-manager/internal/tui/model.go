@@ -221,6 +221,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = nil
 		m.mode = modeBoard
 		return m, nil
+	case worktreeCreatedMsg:
+		m.applyReload(msg.reloadedMsg)
+		m.statusBar = msg.summary
+		m.err = nil
+		return m, nil
 	case errMsg:
 		m.err = msg.err
 		return m, nil

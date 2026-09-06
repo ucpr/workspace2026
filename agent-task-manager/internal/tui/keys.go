@@ -17,6 +17,7 @@ type keyMap struct {
 	Delete      key.Binding
 	DepEditor   key.Binding
 	Graph       key.Binding
+	Worktree    key.Binding
 	GoalFilter  key.Binding
 	FilterMenu  key.Binding
 	Sort        key.Binding
@@ -45,6 +46,7 @@ var keys = keyMap{
 	Delete:     key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete task")),
 	DepEditor:  key.NewBinding(key.WithKeys("D"), key.WithHelp("D", "edit dependencies")),
 	Graph:      key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "dependency graph")),
+	Worktree:   key.NewBinding(key.WithKeys("W"), key.WithHelp("W", "create git worktree")),
 	GoalFilter: key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "filter by goal")),
 	FilterMenu: key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "filter by label/priority")),
 	Sort:       key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "cycle sort")),
@@ -66,7 +68,8 @@ func helpLines() []string {
 		"H / L     move task         n          new task",
 		"e         edit task         d          delete task",
 		"D         edit dependencies g          dependency graph",
-		"G         filter by goal    f          filter label/priority",
+		"W         create worktree   G          filter by goal",
+		"f         filter label/priority",
 		"s         cycle sort        /          search",
 		"S         github sync       i          github import",
 		"c         add comment       tab        switch detail tab",

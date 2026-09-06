@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -21,6 +24,41 @@ func newTestModel(t *testing.T) (*Model, *service.Service) {
 	m := New(svc, st)
 	runCmd(t, m, m.Init())
 	return m, svc
+}
+
+// newGitBackedTestModel is like newTestModel but the store's parent
+// directory is a real git repo, which worktree operations require.
+func newGitBackedTestModel(t *testing.T) (*Model, *service.Service) {
+	t.Helper()
+	dir := t.TempDir()
+	runGit(t, dir, "init", "-q")
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	runGit(t, dir, "add", "README.md")
+	runGit(t, dir, "commit", "-q", "-m", "init")
+
+	st, err := store.Init(dir)
+	if err != nil {
+		t.Fatalf("store.Init() error = %v", err)
+	}
+	svc := service.New(st)
+	m := New(svc, st)
+	runCmd(t, m, m.Init())
+	return m, svc
+}
+
+func runGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com",
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
 }
 
 // runCmd executes cmd (if any) and feeds the resulting message(s) back into
@@ -153,6 +191,34 @@ func TestModel_DeleteTaskWithConfirmation(t *testing.T) {
 	}
 	if _, err := svc.GetTask(task.ID); err == nil {
 		t.Error("task still exists after confirmed delete")
+	}
+}
+
+func TestModel_CreateWorktreeFromBoard(t *testing.T) {
+	m, svc := newGitBackedTestModel(t)
+	task, err := svc.AddTask(service.AddTaskInput{Title: "worktree me"})
+	if err != nil {
+		t.Fatalf("AddTask() error = %v", err)
+	}
+	runCmd(t, m, m.reload())
+
+	sendKey(t, m, "W")
+
+	if m.err != nil {
+		t.Fatalf("model err after 'W' = %v", m.err)
+	}
+	got, err := svc.GetTask(task.ID)
+	if err != nil {
+		t.Fatalf("GetTask() error = %v", err)
+	}
+	if got.Execution.Worktree == nil {
+		t.Fatal("Execution.Worktree = nil after 'W', want set")
+	}
+	if _, err := os.Stat(got.Execution.Worktree.Path); err != nil {
+		t.Errorf("worktree dir missing: %v", err)
+	}
+	if m.statusBar == "" {
+		t.Error("statusBar empty after creating a worktree, want a confirmation message")
 	}
 }
 

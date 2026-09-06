@@ -30,6 +30,8 @@ func (m *Model) updateDetail(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(keyMsg, keys.DepEditor):
 		m.startDepEditor(m.detailTaskID)
+	case key.Matches(keyMsg, keys.Worktree):
+		return m, m.createWorktree(m.detailTaskID)
 	case key.Matches(keyMsg, keys.Comment):
 		m.commentInput.SetValue("")
 		m.commentInput.Focus()
@@ -51,7 +53,12 @@ func (m *Model) viewDetail() string {
 	b.WriteString(titleStyle.Render(fmt.Sprintf(" %s ", t.Title)))
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render(fmt.Sprintf("%s  status=%s  priority=%s", t.ID, depgraph.DerivedStatus(t, m.tasksByID), t.Priority)))
-	b.WriteString("\n\n")
+	b.WriteString("\n")
+	if wt := t.Execution.Worktree; wt != nil {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("worktree: %s  (branch %s)", wt.Path, wt.Branch)))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
 
 	var tabLine strings.Builder
 	for i, name := range detailTabs {
@@ -75,7 +82,7 @@ func (m *Model) viewDetail() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpHintStyle.Render("tab: switch  e: edit  D: dependencies  c: comment  d: delete  esc: back"))
+	b.WriteString(helpHintStyle.Render("tab: switch  e: edit  D: dependencies  W: worktree  c: comment  d: delete  esc: back"))
 	return b.String()
 }
 

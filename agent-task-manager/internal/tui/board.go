@@ -78,6 +78,10 @@ func (m *Model) updateBoard(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.detailTaskID = t.ID
 			m.mode = modeGraph
 		}
+	case key.Matches(keyMsg, keys.Worktree):
+		if t := m.focusedTask(); t != nil {
+			return m, m.createWorktree(t.ID)
+		}
 	case key.Matches(keyMsg, keys.GoalFilter):
 		m.goalPickerCursor = 0
 		m.mode = modeGoalPicker

@@ -37,6 +37,7 @@ func NewRootCmd() *cobra.Command {
 		newGoalCmd(),
 		newNextCmd(),
 		newCompleteCmd(),
+		newGitHubCmd(),
 	)
 	return root
 }
@@ -53,13 +54,22 @@ func workDir() (string, error) {
 // loadService locates the store for the current directory and returns a
 // ready-to-use service.
 func loadService() (*service.Service, error) {
-	wd, err := workDir()
-	if err != nil {
-		return nil, err
-	}
-	st, err := store.Find(wd)
+	st, err := loadStore()
 	if err != nil {
 		return nil, err
 	}
 	return service.New(st), nil
+}
+
+// loadStore locates the store for the current directory. Most commands go
+// through loadService instead; the github command group uses the store
+// directly since it needs field-level control service.Service doesn't
+// expose (requirements §8.1: github sync is a separate, independently
+// testable layer built on the same store).
+func loadStore() (*store.Store, error) {
+	wd, err := workDir()
+	if err != nil {
+		return nil, err
+	}
+	return store.Find(wd)
 }

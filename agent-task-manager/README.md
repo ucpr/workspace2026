@@ -60,6 +60,45 @@ Next task: atm-01a0757a-e6b6-870d-8630-b34aa3fddb38  Implement /search endpoint
 
 Any unambiguous ID prefix works, so `atm-01a0757a-e6a5` is enough.
 
+## How to develop with it
+
+The cycle is: **plan a graph → review it → let an agent drain it → commit the result.**
+
+**1. Plan.** Ask an agent to decompose the request, or write the tasks yourself. Two rules make the graph worth having: one task = one reviewable unit of work, and `--body` carries the done-condition, because the agent that picks the task up later sees only what is stored.
+
+```sh
+atama task add "Implement /search endpoint" --goal "$goal" --depends-on "$t1" \
+  --body "Add GET /search backed by the index from the previous task. Done when it returns ranked results and the handler is unit-tested."
+```
+
+Add `--depends-on` only for real ordering constraints — `next` returns *every* Ready task, so a loose graph fans out to parallel agents while an over-linked one runs single-file.
+
+**2. Review before executing.** `atama task list --goal "$goal"` shows what is Ready (`*`) and what is `blocked` by dependencies; `atama board` is the same view with editing. This is the cheap moment to fix ordering — after the agent starts, it is a rebase.
+
+**3. Execute.** Each iteration is: `next` → claim → work → report.
+
+```sh
+id=$(atama next --goal "$goal" --output json | jq -r '.[0].id // empty')
+atama task status "$id" in_progress    # claim: this removes it from `next`
+# ... do the work ...
+atama complete "$id"
+```
+
+Claiming matters: a task left in `backlog` while you work on it will be handed to the next agent too. And a task left in `in_progress` disappears from `next` forever — if you stop mid-task, set it back to `backlog`, or to `blocked` and record why in `--body`.
+
+**4. Adjust as you learn.** Work uncovers work. Put it in the graph instead of a scratchpad, so the ordering stays true:
+
+```sh
+new=$(atama task add "Backfill existing rows" --goal "$goal" --output json | jq -r .id)
+atama dep add "$id" --on "$new"
+```
+
+**5. Commit `.atama/` with the code.** One file per task means the diff shows exactly which task moved to `done` and which dependencies changed — the plan is reviewed in the same PR as the implementation. If the work also lives on GitHub, close the loop with `atama github sync --dry-run` then `atama github sync`.
+
+An empty `atama next` means either "finished" or "everything is stuck", and they look identical. Check with `atama task list` before declaring victory.
+
+> Using Claude Code? [`.claude/skills/atama/SKILL.md`](.claude/skills/atama/SKILL.md) teaches this workflow to the agent, including the JSON shapes and exit codes it should branch on.
+
 ## Use cases
 
 ### 1. An agent working a goal to completion

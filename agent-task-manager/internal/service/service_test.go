@@ -201,6 +201,30 @@ func TestNext_ReadyOrder(t *testing.T) {
 	}
 }
 
+func TestAddComment(t *testing.T) {
+	svc := newTestService(t)
+	task, _ := svc.AddTask(AddTaskInput{Title: "a"})
+
+	updated, err := svc.AddComment(task.ID, "alice", "looks good")
+	if err != nil {
+		t.Fatalf("AddComment() error = %v", err)
+	}
+	if len(updated.Comments) != 1 {
+		t.Fatalf("Comments = %v, want 1", updated.Comments)
+	}
+	c := updated.Comments[0]
+	if c.Author != "alice" || c.Body != "looks good" {
+		t.Errorf("comment = %+v, want author=alice body=looks good", c)
+	}
+	if c.GitHubCommentID != nil {
+		t.Errorf("GitHubCommentID = %v, want nil for a local-only comment", c.GitHubCommentID)
+	}
+
+	if _, err := svc.AddComment(task.ID, "alice", ""); err == nil {
+		t.Error("AddComment() with empty body = nil error, want error")
+	}
+}
+
 func idsOf(tasks []*model.Task) []string {
 	out := make([]string, len(tasks))
 	for i, t := range tasks {

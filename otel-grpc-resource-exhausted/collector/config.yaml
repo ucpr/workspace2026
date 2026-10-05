@@ -1,0 +1,22 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        # Default is 4 MiB; written out explicitly because it is the limit
+        # this experiment hits. Raise it to see the error disappear.
+        max_recv_msg_size_mib: ${env:MAX_RECV_MSG_SIZE_MIB}
+
+processors:
+  batch: {}
+
+exporters:
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

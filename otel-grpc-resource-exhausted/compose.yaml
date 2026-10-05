@@ -1,0 +1,38 @@
+name: otel-grpc-resource-exhausted
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.135.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      MAX_RECV_MSG_SIZE_MIB: ${MAX_RECV_MSG_SIZE_MIB:-4}
+    volumes:
+      - ./collector/config.yaml:/etc/otelcol/config.yaml:ro
+
+  api-server:
+    build:
+      context: .
+      args:
+        CMD_NAME: server
+    environment:
+      OTEL_SERVICE_NAME: api-server
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+      # BatchSpanProcessor knobs (SDK defaults shown).
+      OTEL_BSP_MAX_EXPORT_BATCH_SIZE: ${OTEL_BSP_MAX_EXPORT_BATCH_SIZE:-512}
+      OTEL_BSP_MAX_QUEUE_SIZE: ${OTEL_BSP_MAX_QUEUE_SIZE:-2048}
+      OTEL_BSP_SCHEDULE_DELAY: ${OTEL_BSP_SCHEDULE_DELAY:-5000}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - otel-collector
+
+  # One-shot load generator: docker compose run --rm loadgen -url ... -rps ...
+  loadgen:
+    profiles: ["tools"]
+    build:
+      context: .
+      args:
+        CMD_NAME: loadgen
+    depends_on:
+      - api-server
